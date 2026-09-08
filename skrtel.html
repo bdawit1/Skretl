@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Skrtel — PL Player Guessing Game</title>
+<style>
+@keyframes flipIn{0%{transform:scaleY(0);opacity:0}55%{transform:scaleY(1.05)}100%{transform:scaleY(1);opacity:1}}
+@keyframes spin{to{transform:rotate(360deg)}}
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#1a003d;--sf:#220048;--bd:#4a0078;--t:#fff;--t2:#c4a8ff;--t3:#9b7acc;--g1:#00ffa3;--g2:#9333ea;--g3:#ff2df7}
+body{background:var(--bg);color:var(--t);font-family:system-ui,-apple-system,sans-serif;min-height:100vh}
+#G{max-width:720px;margin:0 auto;padding:0 14px 60px;position:relative;min-height:100vh}
+.cell{height:50px;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2px;animation:flipIn .38s ease both;word-break:break-word;overflow-wrap:anywhere}
+.ec{height:50px;border-radius:6px;background:#1d0038;border:1px dashed #4a0078}
+.di{padding:10px 14px;cursor:pointer;font-size:13px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #2d0050;transition:background .1s;color:#fff}
+.di:hover{background:#35006a}.di:last-child{border-bottom:none}
+.ch{font-size:9px;color:#6b4fa0;text-transform:uppercase;letter-spacing:.06em;text-align:center}
+.inp{background:var(--sf);border:1.5px solid var(--bd);border-radius:10px;color:var(--t);font-size:14px;font-family:inherit;padding:12px 15px;width:100%;outline:none;transition:border-color .15s}
+.inp:focus{border-color:var(--g1)}.inp:disabled{opacity:.45;cursor:not-allowed}
+.btn{padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;transition:opacity .15s}.btn:hover{opacity:.85}
+.bp{background:var(--g1);color:#0b0020}.bs{background:none;border:1px solid var(--bd);color:var(--t2)}
+a{color:var(--g1)}
+</style>
+</head>
+<body>
+<div id="G">
+
+<!-- HEADER -->
+<div style="text-align:center;padding:22px 0 16px;border-bottom:1px solid #4a0078;margin-bottom:20px">
+  <div style="font-size:30px;font-weight:700;letter-spacing:-.5px;color:#fff;margin-bottom:4px">⚽ <span style="color:#00ffa3">S</span>krtel</div>
+  <div style="font-size:12px;color:#9b7acc;margin-bottom:14px">The Premier League Player Guessing Game · 8 Chances · New Player Daily</div>
+  <div style="display:flex;justify-content:center;align-items:center;gap:24px;font-size:13px;color:#9b7acc">
+    <span>🔥 Streak: <b id="sStr" style="color:#fff">0</b></span>
+    <span>📅 Puzzle #<b id="sPuz" style="color:#fff">1</b></span>
+    <button onclick="openHelp()" style="background:none;border:1px solid #4a0078;color:#9b7acc;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:14px;font-weight:700;line-height:1;font-family:inherit">?</button>
+  </div>
+</div>
+
+<!-- SETUP VIEW -->
+<div id="vSetup">
+  <div style="max-width:480px;margin:30px auto;text-align:center">
+    <div style="font-size:52px;margin-bottom:16px">🔑</div>
+    <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:10px">Connect To API-Football</div>
+    <div style="font-size:13px;color:#9b7acc;margin-bottom:26px;line-height:1.9">
+      Skrtel loads all ~556 Premier League 2025/26 players live from
+      <b style="color:#00ffa3">api-football.com</b>.<br>
+      Get your free API key at <a href="https://dashboard.api-football.com" target="_blank"><b>dashboard.api-football.com</b></a>
+      <br>(100 requests/day free — player data is cached for 7 days).
+    </div>
+    <input id="apiKeyInp" class="inp" placeholder="Paste your x-apisports-key here..." style="margin-bottom:14px"/>
+    <button onclick="startWithKey()" class="btn bp" style="width:100%;padding:14px;font-size:15px;margin-bottom:12px">Load All Players →</button>
+    <div id="apiErr" style="display:none;color:#ff2df7;font-size:13px;margin-bottom:14px;line-height:1.7;text-align:left;background:#3a0028;padding:12px 16px;border-radius:10px;border:1px solid #ff2df7"></div>
+    <div style="font-size:11px;color:#6b4fa0;margin-top:4px">Your key is stored in your browser and never transmitted to anyone other than api-football.com.</div>
+  </div>
+</div>
+
+<!-- LOADING VIEW -->
+<div id="vLoad" style="display:none">
+  <div style="max-width:400px;margin:70px auto;text-align:center">
+    <div style="font-size:44px;display:inline-block;animation:spin 1.5s linear infinite;margin-bottom:22px">⚽</div>
+    <div style="font-size:17px;font-weight:600;color:#fff;margin-bottom:10px">Loading Premier League Players</div>
+    <div id="pTxt" style="font-size:13px;color:#9b7acc;margin-bottom:16px">Connecting to API-Football...</div>
+    <div style="background:#2d0050;border-radius:10px;height:12px;overflow:hidden">
+      <div id="pBar" style="height:12px;background:linear-gradient(90deg,#00ffa3,#9333ea);border-radius:10px;width:3%;transition:width .3s ease"></div>
+    </div>
+    <div id="pCnt" style="font-size:12px;color:#6b4fa0;margin-top:10px"></div>
+  </div>
+</div>
+
+<!-- GAME VIEW -->
+<div id="vGame" style="display:none">
+  <div id="sWrap" style="position:relative;margin-bottom:16px;z-index:50">
+    <input id="srch" class="inp" autocomplete="off" placeholder="Type a player name (e.g. Haaland, Salah, Palmer)..."/>
+    <div id="dd" style="position:absolute;top:calc(100% + 4px);left:0;right:0;background:#220048;border:1px solid #4a0078;border-radius:10px;max-height:250px;overflow-y:auto;display:none;z-index:100;box-shadow:0 8px 32px rgba(0,0,0,.5)"></div>
+  </div>
+
+  <div id="colHdr" style="display:grid;grid-template-columns:82px repeat(8,minmax(0,1fr));gap:3px;margin-bottom:7px">
+    <div class="ch" style="text-align:left">Player</div>
+    <div class="ch">Club</div><div class="ch">Country</div><div class="ch">Pos</div>
+    <div class="ch">Age</div><div class="ch">Hgt</div><div class="ch">Shirt</div>
+    <div class="ch">Wld Reg</div><div class="ch">Club Reg</div>
+  </div>
+
+  <div id="grid" style="display:flex;flex-direction:column;gap:4px;margin-bottom:14px"></div>
+
+  <div id="gInfo" style="text-align:center;font-size:12px;color:#9b7acc;margin-bottom:16px">
+    Guesses Remaining: <b id="gLeft" style="color:#fff">8</b>
+  </div>
+
+  <!-- HINT -->
+  <div style="background:#220048;border:1px solid #4a0078;border-radius:14px;padding:16px 18px;display:flex;align-items:center;gap:16px;margin-bottom:14px">
+    <div style="width:64px;height:82px;background:#1a003d;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+      <svg id="silSvg" width="48" height="76" viewBox="0 0 48 76" style="transition:filter .7s ease;filter:blur(10px)">
+        <circle cx="24" cy="8" r="8" fill="#4a0078"/>
+        <rect x="21" y="14.5" width="6" height="6" rx="2" fill="#4a0078"/>
+        <path d="M11 25 Q24 32 37 25 L39 53 Q30 58 24 59 Q18 58 9 53 Z" fill="#4a0078"/>
+        <line x1="11" y1="28" x2="2" y2="46" stroke="#4a0078" stroke-width="6" stroke-linecap="round"/>
+        <line x1="37" y1="28" x2="46" y2="40" stroke="#4a0078" stroke-width="6" stroke-linecap="round"/>
+        <line x1="17" y1="57" x2="13" y2="76" stroke="#4a0078" stroke-width="7" stroke-linecap="round"/>
+        <line x1="31" y1="57" x2="37" y2="76" stroke="#4a0078" stroke-width="7" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div style="flex:1"><div id="hTxt" style="font-size:13px;color:#9b7acc;line-height:1.7">Reveal The Silhouette Of The Player</div></div>
+    <button id="revBtn" onclick="revealSil()" style="padding:9px 16px;background:none;border:1.5px solid #9333ea;color:#9333ea;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='#9333ea22'" onmouseout="this.style.background='none'">Reveal</button>
+  </div>
+
+  <div style="text-align:center">
+    <button onclick="clearKey()" style="background:none;border:none;color:#4a0078;font-size:11px;cursor:pointer;font-family:inherit;text-decoration:underline">↺ Reset API Key &amp; Reload Data</button>
+  </div>
+</div>
+
+<!-- RESULT MODAL -->
+<div id="rMod" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);align-items:center;justify-content:center;z-index:200;padding:20px">
+  <div style="background:#220048;border:1px solid #4a0078;border-radius:18px;padding:30px 26px;width:100%;max-width:420px;text-align:center;box-shadow:0 0 60px #9333ea44">
+    <div id="rIco" style="font-size:48px;margin-bottom:12px">🏆</div>
+    <div id="rTit" style="font-size:22px;font-weight:700;color:#fff;margin-bottom:8px"></div>
+    <div id="rPlr" style="font-size:14px;color:#9b7acc;margin-bottom:6px"></div>
+    <div id="rStk" style="font-size:13px;color:#9b7acc;margin-bottom:20px"></div>
+    <div id="rEmj" style="background:#1a003d;border-radius:10px;padding:16px;font-size:20px;line-height:1.7;letter-spacing:3px;margin-bottom:20px;border:1px solid #2d0050"></div>
+    <button id="shareBtn" onclick="doShare()" class="btn bp" style="width:100%;padding:13px;font-size:15px;margin-bottom:10px">📋 Copy Result</button>
+    <button onclick="closeM('rMod')" class="btn bs" style="width:100%;padding:10px">Close</button>
+  </div>
+</div>
+
+<!-- HELP MODAL -->
+<div id="hMod" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);align-items:center;justify-content:center;z-index:200;padding:20px">
+  <div style="background:#220048;border:1px solid #4a0078;border-radius:18px;padding:26px;width:100%;max-width:420px;box-shadow:0 0 60px #9333ea44">
+    <div style="font-size:19px;font-weight:700;color:#fff;margin-bottom:14px">How To Play ⚽</div>
+    <div style="font-size:13px;color:#9b7acc;line-height:1.9;margin-bottom:16px">
+      Guess the mystery Premier League player in 8 tries across 8 attributes.<br>
+      Player data is loaded live from API-Football (2025/26 season, ~556 players).
+    </div>
+    <div style="display:flex;flex-direction:column;gap:11px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:12px;font-size:13px;color:#c4a8ff">
+        <div style="min-width:32px;height:32px;background:#00401e;border-radius:6px;border:1.5px solid #00ffa3;flex-shrink:0"></div>
+        <span>Exact Match For That Attribute</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;font-size:13px;color:#c4a8ff">
+        <div style="min-width:32px;height:32px;background:#480068;border-radius:6px;border:1.5px solid #9333ea;flex-shrink:0"></div>
+        <span>Close — Age ±2yr · Height ±3cm · Shirt ±5 · Adjacent Position (GK↔DEF↔MID↔FWD)</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;font-size:13px;color:#c4a8ff">
+        <div style="min-width:32px;height:32px;background:#1d0038;border-radius:6px;border:1.5px solid #4a0078;flex-shrink:0"></div>
+        <span>No Match</span>
+      </div>
+    </div>
+    <div style="font-size:12px;color:#9b7acc;line-height:1.9;margin-bottom:8px"><b style="color:#c4a8ff">Wld Reg</b> = World region of the player's nationality (W. Europe, S. America, Africa, etc.)</div>
+    <div style="font-size:12px;color:#9b7acc;line-height:1.9;margin-bottom:20px"><b style="color:#c4a8ff">Club Reg</b> = Where in England the club is based (London, Northwest, Midlands, etc.)<br>↑ ↓ arrows show if the real value is higher or lower than your guess. Press Enter to select the top suggestion!</div>
+    <button onclick="closeM('hMod')" class="btn bp" style="width:100%;padding:13px;font-size:14px">Got It — Let's Play!</button>
+  </div>
+</div>
+
+</div><!-- end #G -->
+
+<script>
+// ─── COLORS ───
+const CLR={green:{bg:"#00401e",col:"#00ffa3"},yellow:{bg:"#480068",col:"#e09dff"},gray:{bg:"#1d0038",col:"#6b4fa0"}};
+const EMOJ={green:"🟩",yellow:"🟣",gray:"⬛"};
+const MAX=8,GC="82px repeat(8,minmax(0,1fr))";
+
+// ─── CLUB NAME MAP (API → Short Display) ───
+const CN={
+  "Manchester City":"Man City","Manchester United":"Man United",
+  "Tottenham Hotspur":"Spurs","Nottingham Forest":"Nott'm Forest",
+  "Wolverhampton Wanderers":"Wolves","West Ham United":"West Ham",
+  "Newcastle United":"Newcastle","Leicester City":"Leicester",
+  "Ipswich Town":"Ipswich","Brighton & Hove Albion":"Brighton",
+  "Brighton and Hove Albion":"Brighton","AFC Bournemouth":"Bournemouth",
+  "Bournemouth":"Bournemouth","West Bromwich Albion":"West Brom",
+  "Birmingham City":"Birmingham","Coventry City":"Coventry",
+  "Swansea City":"Swansea","Norwich City":"Norwich",
+  "Sheffield Wednesday":"Sheff Wed","Derby County":"Derby",
+  "Hull City":"Hull","Preston North End":"Preston",
+  "Oxford United":"Oxford Utd","Plymouth Argyle":"Plymouth",
+  "Bristol City":"Bristol City","Queens Park Rangers":"QPR",
+  "Cardiff City":"Cardiff","Blackburn Rovers":"Blackburn",
+  "Huddersfield Town":"Huddersfield","Rotherham United":"Rotherham",
+  "Sheffield United":"Sheffield Utd","Luton Town":"Luton",
+  "Leeds United":"Leeds","Sunderland":"Sunderland",
+  "Middlesbrough":"Middlesbrough","Watford":"Watford",
+  "Millwall":"Millwall","Stoke City":"Stoke",
+  "Portsmouth":"Portsmouth","Reading":"Reading",
+  "Barnsley":"Barnsley","Wigan Athletic":"Wigan",
+  "Peterborough United":"Peterborough","Bristol Rovers":"Bristol Rovers",
+  "Exeter City":"Exeter","Charlton Athletic":"Charlton"
+};
+
+// ─── CLUB REGION MAP ───
+const CR={
+  "Arsenal":"London","Chelsea":"London","Crystal Palace":"London","Spurs":"London",
+  "West Ham":"London","Fulham":"London","Brentford":"London","QPR":"London","Millwall":"London","Charlton":"London",
+  "Man City":"Northwest","Man United":"Northwest","Liverpool":"Northwest","Everton":"Northwest",
+  "Burnley":"Northwest","Preston":"Northwest","Blackburn":"Northwest","Wigan":"Northwest",
+  "Newcastle":"Northeast","Sunderland":"Northeast","Middlesbrough":"Northeast",
+  "Aston Villa":"Midlands","Wolves":"Midlands","Nott'm Forest":"Midlands","Leicester":"Midlands",
+  "West Brom":"Midlands","Birmingham":"Midlands","Coventry":"Midlands","Derby":"Midlands","Stoke":"Midlands",
+  "Brighton":"South East","Southampton":"South East","Watford":"South East","Luton":"South East",
+  "Oxford Utd":"South East","Reading":"South East","Portsmouth":"South East",
+  "Bournemouth":"Southwest","Bristol City":"Southwest","Plymouth":"Southwest",
+  "Cardiff":"Southwest","Swansea":"Southwest","Bristol Rovers":"Southwest","Exeter":"Southwest",
+  "Ipswich":"E. England","Norwich":"E. England","Peterborough":"E. England",
+  "Leeds":"Yorkshire","Sheff Wed":"Yorkshire","Sheffield Utd":"Yorkshire","Hull":"Yorkshire",
+  "Rotherham":"Yorkshire","Huddersfield":"Yorkshire","Barnsley":"Yorkshire"
+};
+
+// ─── NATIONALITY → WORLD REGION ───
+const RM={
+  England:0,France:0,Germany:0,Spain:0,Portugal:0,Netherlands:0,Belgium:0,Italy:0,
+  Denmark:0,Sweden:0,Norway:0,Scotland:0,Wales:0,Ireland:0,Switzerland:0,Austria:0,
+  Croatia:0,Serbia:0,Poland:0,"Czech Republic":0,Hungary:0,Slovakia:0,Slovenia:0,
+  Romania:0,Bulgaria:0,Greece:0,Finland:0,Iceland:0,Kosovo:0,Ukraine:0,
+  "Northern Ireland":0,Albania:0,Montenegro:0,"North Macedonia":0,
+  Georgia:0,Armenia:0,Latvia:0,Lithuania:0,Estonia:0,Cyprus:0,
+  "Bosnia and Herzegovina":0,Luxembourg:0,Andorra:0,
+  Brazil:1,Argentina:1,Colombia:1,Uruguay:1,Chile:1,Ecuador:1,Paraguay:1,Peru:1,Venezuela:1,Bolivia:1,
+  Nigeria:2,Senegal:2,Egypt:2,Ghana:2,Cameroon:2,"Ivory Coast":2,Morocco:2,Mali:2,Algeria:2,
+  Tunisia:2,"DR Congo":2,Congo:2,"Sierra Leone":2,Guinea:2,"Burkina Faso":2,"Cape Verde":2,
+  "South Africa":2,Zambia:2,Zimbabwe:2,Benin:2,Togo:2,Liberia:2,Gabon:2,Mauritania:2,
+  "Guinea-Bissau":2,Gambia:2,Angola:2,Rwanda:2,Comoros:2,"Equatorial Guinea":2,
+  USA:3,Canada:3,Jamaica:3,Mexico:3,"Trinidad and Tobago":3,"Costa Rica":3,
+  Honduras:3,Guatemala:3,Cuba:3,Haiti:3,Curacao:3,"Dominican Republic":3,"El Salvador":3,Panama:3,
+  Japan:4,"South Korea":4,"Saudi Arabia":4,Iran:4,Australia:4,China:4,Iraq:4,
+  Jordan:4,Turkey:4,Qatar:4,UAE:4,Uzbekistan:4,"New Zealand":4,Indonesia:4,
+  Thailand:4,Vietnam:4,Oman:4,Lebanon:4,Israel:4,Syria:4,India:4
+};
+const RA=["W. Europe","S. America","Africa","C/N. America","Asia/ME","Other"];
+function nReg(n){return RA[RM[n]??5];}
+
+// ─── API FETCH ───
+async function aFetch(k,p){
+  const r=await fetch("https://v3.football.api-sports.io"+p,{headers:{"x-apisports-key":k}});
+  if(!r.ok) throw new Error("HTTP "+r.status+" — check your connection.");
+  const d=await r.json();
+  const e=d.errors;
+  if(e&&typeof e==="object"&&!Array.isArray(e)&&Object.keys(e).length){
+    const v=Object.values(e)[0];
+    throw new Error(Array.isArray(v)?v[0]:String(v));
+  }
+  return d;
+}
+
+async function loadAll(k){
+  setP(0,1,"Connecting to API-Football...");
+  const d1=await aFetch(k,"/players?league=39&season=2025&page=1");
+  const tot=d1.paging.total;
+  let all=[...d1.response];
+  setP(1,tot,"Page 1/"+tot+" — "+all.length+" players loaded");
+  for(let pg=2;pg<=tot;pg+=4){
+    const b=Array.from({length:Math.min(4,tot-pg+1)},(_,i)=>pg+i);
+    const rs=await Promise.all(b.map(p=>aFetch(k,"/players?league=39&season=2025&page="+p)));
+    for(const r of rs) all.push(...r.response);
+    setP(Math.min(pg+3,tot),tot,"Page "+Math.min(pg+3,tot)+"/"+tot+" — "+all.length+" players loaded");
+    await new Promise(r=>setTimeout(r,110));
+  }
+  const pl=all.map(tx).filter(Boolean);
+  if(pl.length<20) throw new Error("Only "+pl.length+" valid players found. Ensure the 2025/26 season is available on your API plan.");
+  return pl;
+}
+
+function tx({player:p,statistics:s}){
+  if(!s?.length||!p?.nationality||!s[0]?.games?.position) return null;
+  const st=s[0];
+  const pos={Goalkeeper:"GK",Defender:"DEF",Midfielder:"MID",Attacker:"FWD"}[st.games.position];
+  if(!pos) return null;
+  const club=CN[st.team?.name]||st.team?.name||"Unknown";
+  return{
+    n:p.name,c:club,nat:p.nationality,pos,
+    age:p.age||25,
+    hgt:p.height?parseInt(p.height)||180:180,
+    sh:st.games.number||0,
+    reg:nReg(p.nationality),
+    cReg:CR[club]||"Unknown"
+  };
+}
+
+// ─── STORAGE (localStorage since this is a standalone file) ───
+function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
+function lsSet(k,v){try{localStorage.setItem(k,v);}catch(e){}}
+function lsDel(k){try{localStorage.removeItem(k);}catch(e){}}
+
+// ─── STATE ───
+let P=[],TGT=null,guesses=[],status="playing",emojis=[],silR=false,streak=0,shareTxt="";
+const gsd=new Set();
+
+// ─── VIEW MANAGEMENT ───
+function showV(id){
+  ["vSetup","vLoad","vGame"].forEach(v=>{
+    document.getElementById(v).style.display=v===id?"block":"none";
+  });
+}
+function setP(d,t,m){
+  document.getElementById("pTxt").textContent=m;
+  document.getElementById("pBar").style.width=Math.max(3,d/t*100)+"%";
+  document.getElementById("pCnt").textContent=d+" / "+t+" pages fetched";
+}
+function showErr(m){
+  showV("vSetup");
+  const el=document.getElementById("apiErr");
+  el.innerHTML=m;
+  el.style.display="block";
+}
+
+// ─── INIT ───
+async function init(){
+  const key=lsGet("skr_key");
+  if(!key){showV("vSetup");return;}
+  const cached=lsGet("skr_data");
+  if(cached){
+    try{
+      const d=JSON.parse(cached);
+      if(d.ts>Date.now()-7*864e5&&d.pl?.length>20){go(d.pl);return;}
+    }catch(e){}
+  }
+  showV("vLoad");
+  try{
+    const pl=await loadAll(key);
+    lsSet("skr_data",JSON.stringify({ts:Date.now(),pl}));
+    go(pl);
+  }catch(e){showErr("⚠️ "+e.message);}
+}
+
+async function startWithKey(){
+  const key=document.getElementById("apiKeyInp").value.trim();
+  if(!key){showErr("Please enter your API key.");return;}
+  document.getElementById("apiErr").style.display="none";
+  lsSet("skr_key",key);
+  showV("vLoad");
+  try{
+    const pl=await loadAll(key);
+    lsSet("skr_data",JSON.stringify({ts:Date.now(),pl}));
+    go(pl);
+  }catch(e){showErr("⚠️ "+e.message);}
+}
+
+function clearKey(){
+  lsDel("skr_key");lsDel("skr_data");
+  P=[];TGT=null;guesses=[];status="playing";emojis=[];silR=false;streak=0;gsd.clear();
+  document.getElementById("apiErr").style.display="none";
+  document.getElementById("apiKeyInp").value="";
+  showV("vSetup");
+}
+
+// ─── GAME SETUP ───
+function go(pl){P=pl;TGT=todP();showV("vGame");loadGS();}
+function dayN(){return Math.floor((Date.now()-new Date("2025-01-01").getTime())/864e5);}
+function todP(){let h=dayN()*1234567+98765;h=Math.imul(h^(h>>>16),0x45d9f3b);h=Math.imul(h^(h>>>16),0x45d9f3b);h=h^(h>>>16);return P[Math.abs(h)%P.length];}
+
+function loadGS(){
+  try{
+    const d=JSON.parse(lsGet("skr_gs_"+dayN())||"{}");
+    guesses=d.g||[];status=d.st||"playing";emojis=d.em||[];silR=d.sr||false;
+  }catch(e){}
+  streak=parseInt(lsGet("skr_sk"))||0;
+  guesses.forEach(g=>gsd.add(g.n));
+  renderAll();
+}
+function svS(){lsSet("skr_gs_"+dayN(),JSON.stringify({g:guesses,st:status,em:emojis,sr:silR}));}
+function svSk(){lsSet("skr_sk",String(streak));}
+
+// ─── COMPARE LOGIC ───
+function cmp(gv,tv,a){
+  if(a==="pos"){
+    if(gv===tv)return{s:"green",ar:null};
+    const pi=["GK","DEF","MID","FWD"];
+    return{s:Math.abs(pi.indexOf(gv)-pi.indexOf(tv))===1?"yellow":"gray",ar:null};
+  }
+  if(["age","hgt","sh"].includes(a)){
+    const gn=+gv,tn=+tv;
+    if(a==="sh"&&(gn===0||tn===0))return{s:"gray",ar:null};
+    if(gn===tn)return{s:"green",ar:null};
+    const t=a==="age"?2:a==="hgt"?3:5;
+    return{s:Math.abs(gn-tn)<=t?"yellow":"gray",ar:gn<tn?"↑":"↓"};
+  }
+  return{s:gv===tv?"green":"gray",ar:null};
+}
+function bR(g,t){return[
+  {v:g.c,...cmp(g.c,t.c,"eq")},
+  {v:g.nat,...cmp(g.nat,t.nat,"eq")},
+  {v:g.pos,...cmp(g.pos,t.pos,"pos")},
+  {v:String(g.age),...cmp(g.age,t.age,"age")},
+  {v:g.hgt+"cm",...cmp(g.hgt,t.hgt,"hgt")},
+  {v:g.sh?"#"+g.sh:"?",...cmp(g.sh,t.sh,"sh")},
+  {v:g.reg,...cmp(g.reg,t.reg,"eq")},
+  {v:g.cReg,...cmp(g.cReg,t.cReg,"eq")}
+];}
+
+// ─── RENDER ───
+function nrm(s){return s.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();}
+
+function renderAll(){
+  document.getElementById("sStr").textContent=streak;
+  document.getElementById("sPuz").textContent=dayN();
+  renderGrid();
+  document.getElementById("gLeft").textContent=MAX-guesses.length;
+  document.getElementById("gInfo").style.display=status==="playing"?"block":"none";
+  const s=document.getElementById("srch");
+  s.disabled=status!=="playing";
+  s.placeholder=status==="won"?"🏆 Correct! Come Back Tomorrow":
+    status==="lost"?"😔 Game Over — Try Again Tomorrow":
+    "Type A Player Name (e.g. Haaland, Salah, Palmer)...";
+  if(silR)doRev();
+  if(status!=="playing")setTimeout(openRes,700);
+}
+
+function renderGrid(){
+  const g=document.getElementById("grid");g.innerHTML="";
+  guesses.forEach(({n,result})=>{
+    const row=document.createElement("div");
+    row.style.cssText="display:grid;grid-template-columns:"+GC+";gap:3px";
+    const nm=document.createElement("div");
+    nm.style.cssText="display:flex;align-items:center;font-size:11px;font-weight:500;color:#fff;padding:0 5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis";
+    nm.textContent=n;nm.title=n;row.appendChild(nm);
+    result.forEach((c,ci)=>{
+      const el=document.createElement("div");el.className="cell";
+      el.style.animationDelay=(ci*55)+"ms";
+      const cl=CLR[c.s];el.style.background=cl.bg;el.style.color=cl.col;
+      el.innerHTML=`<div style="font-size:9.5px;font-weight:600;line-height:1.25;padding:0 1px">${c.v}</div>${c.ar?`<div style="font-size:13px;line-height:1">${c.ar}</div>`:""}`;
+      row.appendChild(el);
+    });
+    g.appendChild(row);
+  });
+  for(let i=guesses.length;i<MAX;i++){
+    const row=document.createElement("div");
+    row.style.cssText="display:grid;grid-template-columns:"+GC+";gap:3px";
+    const nm=document.createElement("div");
+    nm.style.cssText="display:flex;align-items:center;font-size:11px;color:#4a0078;padding:0 5px";
+    nm.textContent=(i===0&&status==="playing")?"← Type Above":"";
+    row.appendChild(nm);
+    for(let j=0;j<8;j++){const e=document.createElement("div");e.className="ec";row.appendChild(e);}
+    g.appendChild(row);
+  }
+}
+
+function gSug(q){
+  const nq=nrm(q);
+  if(!nq||!P.length)return[];
+  return P.filter(p=>!gsd.has(p.n)&&nrm(p.n).includes(nq)).slice(0,10);
+}
+function rDd(pl){
+  const dd=document.getElementById("dd");dd.innerHTML="";
+  if(!pl.length){dd.style.display="none";return;}
+  pl.forEach(p=>{
+    const el=document.createElement("div");el.className="di";
+    el.innerHTML=`<span style="font-weight:500">${p.n}</span><span style="font-size:11px;color:#9b7acc">${p.c} · ${p.cReg}</span>`;
+    el.addEventListener("mousedown",e=>{e.preventDefault();mkG(p);});
+    dd.appendChild(el);
+  });
+  dd.style.display="block";
+}
+
+function mkG(p){
+  if(status!=="playing"||gsd.has(p.n))return;
+  gsd.add(p.n);
+  const result=bR(p,TGT);
+  emojis.push(result.map(c=>EMOJ[c.s]).join(""));
+  guesses.push({n:p.n,result});
+  const won=result.every(c=>c.s==="green");
+  if(won){status="won";streak++;svSk();}
+  else if(guesses.length>=MAX){status="lost";streak=0;svSk();}
+  document.getElementById("srch").value="";
+  document.getElementById("dd").style.display="none";
+  document.getElementById("sStr").textContent=streak;
+  renderGrid();
+  document.getElementById("gLeft").textContent=MAX-guesses.length;
+  document.getElementById("gInfo").style.display=status==="playing"?"block":"none";
+  if(status!=="playing"){
+    const s=document.getElementById("srch");s.disabled=true;
+    s.placeholder=status==="won"?"🏆 Correct! Come Back Tomorrow":"😔 Game Over — Try Again Tomorrow";
+    setTimeout(openRes,800);
+  }
+  svS();
+}
+
+function revealSil(){silR=true;doRev();svS();}
+function doRev(){
+  document.getElementById("silSvg").style.filter="none";
+  document.getElementById("hTxt").textContent="Silhouette Revealed — "+TGT.pos+" · "+TGT.c+" ("+TGT.cReg+")";
+  document.getElementById("revBtn").style.display="none";
+}
+
+function openRes(){
+  const won=status==="won",cnt=won?guesses.length:"X";
+  shareTxt="⚽ Skrtel #"+dayN()+"\n"+cnt+"/"+MAX+"\n\n"+emojis.join("\n")+"\n\n#Skrtel #PremierLeague";
+  document.getElementById("rIco").textContent=won?"🏆":"😔";
+  document.getElementById("rTit").textContent=won?"Brilliant!":"Better Luck Tomorrow!";
+  document.getElementById("rPlr").innerHTML="The Player Was <b style='color:#00ffa3'>"+TGT.n+"</b><br><span style='font-size:12px'>"+TGT.c+" · "+TGT.cReg+"</span>";
+  document.getElementById("rStk").innerHTML=won?"🔥 Streak: <b style='color:#00ffa3'>"+streak+"</b>":"💔 Streak Reset";
+  document.getElementById("rEmj").innerHTML=
+    "<div style='font-size:12px;color:#6b4fa0;margin-bottom:10px'>⚽ Skrtel #"+dayN()+" · "+cnt+"/"+MAX+"</div>"+
+    "<div style='line-height:1.7'>"+emojis.join("<br>")+"</div>";
+  showM("rMod");
+}
+
+function doShare(){
+  const btn=document.getElementById("shareBtn");
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(shareTxt).then(()=>{
+      btn.textContent="✓ Copied!";
+      setTimeout(()=>btn.textContent="📋 Copy Result",2200);
+    }).catch(()=>alert(shareTxt));
+  } else alert(shareTxt);
+}
+
+function showM(id){document.getElementById(id).style.display="flex";}
+function closeM(id){document.getElementById(id).style.display="none";}
+function openHelp(){showM("hMod");}
+
+// ─── EVENTS ───
+const srch=document.getElementById("srch");
+srch.addEventListener("input",e=>rDd(gSug(e.target.value)));
+srch.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){document.getElementById("dd").style.display="none";srch.value="";}
+  if(e.key==="Enter"){const s=gSug(srch.value);if(s.length)mkG(s[0]);}
+});
+document.addEventListener("click",e=>{
+  if(!e.target.closest("#sWrap"))document.getElementById("dd").style.display="none";
+});
+document.getElementById("apiKeyInp").addEventListener("keydown",e=>{
+  if(e.key==="Enter")startWithKey();
+});
+
+// ─── BOOT ───
+init();
+</script>
+</body>
+</html>
